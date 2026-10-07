@@ -14,6 +14,9 @@ in whatever shape you already use. A small config file tells the board which fie
   shows it as in review, with draft, approved and changes-requested labels. This is worked out
   each time the board loads; nothing is written to your files or committed.
 - **Drag to change status.** Only the `status:` line changes, so the git diff is one line.
+- **Built for coding agents.** `boardmd list`, `new`, `set` and `check` let an agent read, create
+  and update tasks safely, and `boardmd init` tells the repo's agents (CLAUDE.md, AGENTS.md, a
+  Claude Code skill) how.
 
 It suits repos where a coding agent keeps the task files: the board reads the agent's files as
 they are and shows its branches and pull requests as they happen.
@@ -80,16 +83,29 @@ The page updates by itself while it runs, so you can leave it open. If you start
 ### Commands
 
 ```
-boardmd init  [--yes] [--force] [--tasks-dir <folder>] [--config boardmd.config.json]
-boardmd serve [--port 4600] [--open] [--offline] [--config boardmd.config.json]
+Set up and serve:
+  boardmd init                  Look at your task files and write boardmd.config.json
+  boardmd serve [--open]        Serve the board on http://127.0.0.1:4600
 
-  -y, --yes        init: accept every suggestion without asking
-      --force      init: replace an existing config
-      --tasks-dir  init: the folder that holds the task files (found by itself otherwise)
-  -p, --port       serve: port to listen on (default 4600)
-  -o, --open       serve: open the board in a browser
-      --offline    serve: skip git branch and GitHub PR lookups
-  -c, --config     Config file (default boardmd.config.json)
+Read and change tasks (for you, scripts and coding agents):
+  boardmd [list]                Open tasks with live branch and PR state, as tables
+  boardmd show <id>             One task, with its notes
+  boardmd new "<title>"         Create a task with the next id, in the right folder
+  boardmd set <id> f=v [f=v…]   Change fields; only those lines of the file change
+  boardmd check                 Validate the task files (exits 1 on problems)
+  boardmd guide [--install]     This repo's task rules for agents; --install adds them
+                                to CLAUDE.md or AGENTS.md and writes a Claude Code skill
+
+Options:
+  list:   --all  --json  --status <s>  --<field> <value>  --where <field>=<value>
+  show:   --json
+  new:    --set <field>=<value> (repeatable)  --status <s>  --body <markdown>
+          --body-file <file|->  --dry-run  --json
+  set:    --json
+  check:  --json
+  init:   -y, --yes  --force  --tasks-dir <folder>
+  serve:  -p, --port <n>  -o, --open
+  any:    -c, --config <file>  --offline (skip git and gh)  -h, --help  -v, --version
 ```
 
 The server listens on 127.0.0.1 only.
@@ -102,6 +118,34 @@ The server listens on 127.0.0.1 only.
 - `Port 4600 is already in use`: another board (or app) is running; use `--port 4601`.
 - Cards are missing: files that couldn't be read are listed at the top of the page, with the
   reason.
+
+## Coding agents
+
+A coding agent working in your repo (Claude Code, Codex, Cursor and others) can manage tasks
+through the same commands, without hand-editing frontmatter.
+
+**How it finds out.** `boardmd init` offers to add a short section to `CLAUDE.md` or `AGENTS.md`,
+between `<!-- boardmd:start -->` and `<!-- boardmd:end -->`, and to write a Claude Code skill in
+`.claude/skills/boardmd/`. Both point the agent at `boardmd guide`, which prints this repo's rules,
+worked out from the config: where tasks live, the id format, each field's allowed values, the
+branch naming, and the checks. Run `boardmd guide --install` to add or refresh them later; the
+section is replaced in place, and the rest of the file is left alone.
+
+**What it runs.**
+
+| Command | What it guarantees |
+| --- | --- |
+| `boardmd list --json` | Every open task with its fields, file, and live state from git and GitHub (`--all` for finished ones, `--status`, `--<field>` filters). |
+| `boardmd show TUI-12` | The file as it is, with its live state. |
+| `boardmd new "Grade levels" --set phase=P2 --set priority=P1` | The next id, the folder (`newTask.folderBy`), the file name (`newTask.fileName`), and the same keys in the same order as the other files. Missing required fields and disallowed values are refused, with the allowed values listed. |
+| `boardmd set TUI-12 status=done pr=41` | Only those lines change (a missing key is added as one line), values are checked, and the write is atomic. Changing the folder field moves the file. It warns when git shows the task in progress or in review, since its status usually changes in its own PR. |
+| `boardmd check` | Unique ids, the id pattern, file names and folders, required fields, allowed values, PR numbers, and the config's `rules`. Exits 1 with one line per problem. |
+
+The board picks up every change live, so you can watch an agent work.
+
+`list --json` prints each task's frontmatter plus `file`, `folder`, `filename` and, when there is
+one, `live`: `{ "state": "in-progress", "branch" }`, `{ "state": "in-review", "pr", "base", "note" }`
+(note is `draft`, `changes requested`, `approved` or empty) or `{ "state": "merged", "pr", "note" }`.
 
 ## Task files
 
@@ -169,12 +213,13 @@ A full one, with every section:
     { "name": "Deferred", "status": "deferred", "collapsed": true }
   ],
   "fields": {
-    "phase": { "label": "Phase", "swimlane": true, "values": { "P1": "Foundation", "P2": "Features" } },
-    "module": { "label": "Module", "filter": true },
+    "phase": { "label": "Phase", "swimlane": true, "required": true, "values": { "P1": "Foundation", "P2": "Features" } },
+    "module": { "label": "Module", "filter": true, "required": true },
     "priority": { "label": "Priority", "badge": true, "values": { "P0": "Must", "P1": "Should" } },
     "size": { "label": "Size", "badge": true },
-    "endpoints": { "label": "Endpoints", "list": true }
+    "endpoints": { "label": "Endpoints", "list": true, "required": true }
   },
+  "newTask": { "folderBy": "phase", "fileName": "{id-lower}-{slug}.md" },
   "live": {
     "baseBranch": "main",
     "branchPattern": "^(?:task|docs|fix)/demo-(\\d+(?:-\\d+)*)-[a-z]",
@@ -183,6 +228,14 @@ A full one, with every section:
     "prField": "pr",
     "ignoreStatuses": ["done", "deferred"]
   },
+  "rules": [
+    {
+      "if": { "status": "done", "branch": "*" },
+      "unless": { "phase": "P0" },
+      "require": ["pr"],
+      "message": "done with a branch but no pr"
+    }
+  ],
   "checkCommand": "npm run -s check-tasks",
   "afterEditHint": "Commit status changes in their own PR."
 }
@@ -196,8 +249,10 @@ A full one, with every section:
 | `statusField`   | Default `status`. The only field the board ever writes.                                                                                                                                                                                  |
 | `statuses`      | Every allowed status. A drop must land on one of these.                                                                                                                                                                                  |
 | `columns`       | In order. A column shows cards whose file has its `status`, or whose live state is in its `live` list (`in-progress`, `in-review`). Only columns with a `status` accept drops. Tasks whose status matches no column go in an extra "Other" column. |
-| `fields`        | Extra frontmatter fields: `label`, display labels for `values`, and whether the field is a card `badge`, a `filter`, the `swimlane` (one field at most) or a `list`. Fields with `values`, badges and the swimlane are filters unless `filter` is `false`. |
+| `fields`        | Extra frontmatter fields: `label`, display labels for `values`, and whether the field is a card `badge`, a `filter`, the `swimlane` (one field at most) or a `list`. Fields with `values`, badges and the swimlane are filters unless `filter` is `false`. With `values`, `check`, `new` and `set` only accept those values; `required: true` makes them insist on one. |
+| `newTask`       | How `boardmd new` places files: `folderBy` (a field whose value picks the subfolder, `p2-…/` for `P2`), `fileName` (`{id}`, `{id-lower}`, `{n}`, `{slug}`; default `{id-lower}-{slug}.md`, and `check` enforces it when set), `defaults` (values for fields not given) and `heading` (start the body with `# <id> <title>`, default `true`). |
 | `live`          | How branches and PRs map to tasks (see below). Leave it out to switch live state off.                                                                                                                                                    |
+| `rules`         | Extra checks for `boardmd check`: a task matching `if` (and not `unless`) needs the `require` fields. A test is a value, a list of values, `"*"` (set) or `null` (empty).                                                                   |
 | `checkCommand`  | Optional shell command, run in the config's folder after each edit. If it fails, its output is shown as a warning. It never blocks the edit.                                                                                              |
 | `afterEditHint` | Text shown in the uncommitted-changes banner.                                                                                                                                                                                            |
 

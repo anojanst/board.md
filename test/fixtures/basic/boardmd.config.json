@@ -13,12 +13,13 @@
     { "name": "Deferred", "status": "deferred", "collapsed": true }
   ],
   "fields": {
-    "phase": { "label": "Phase", "swimlane": true, "values": { "P1": "Foundation", "P2": "Features" } },
-    "module": { "label": "Module", "filter": true },
-    "priority": { "label": "Priority", "badge": true, "values": { "P0": "Must", "P1": "Should", "P2": "Could" } },
-    "size": { "label": "Size", "badge": true, "values": { "S": "S", "M": "M", "L": "L" } },
-    "endpoints": { "label": "Endpoints", "list": true }
+    "phase": { "label": "Phase", "swimlane": true, "required": true, "values": { "P1": "Foundation", "P2": "Features" } },
+    "module": { "label": "Module", "filter": true, "required": true },
+    "priority": { "label": "Priority", "badge": true, "required": true, "values": { "P0": "Must", "P1": "Should", "P2": "Could" } },
+    "size": { "label": "Size", "badge": true, "required": true, "values": { "S": "S", "M": "M", "L": "L" } },
+    "endpoints": { "label": "Endpoints", "list": true, "required": true }
   },
+  "newTask": { "folderBy": "phase", "fileName": "{id-lower}-{slug}.md" },
   "live": {
     "baseBranch": "main",
     "branchPattern": "^(?:task|docs|fix)/demo-(\\d+(?:-\\d+)*)-[a-z]",
@@ -26,5 +27,13 @@
     "branchField": "branch",
     "prField": "pr",
     "ignoreStatuses": ["done", "deferred"]
-  }
+  },
+  "rules": [
+    {
+      "if": { "status": "done", "branch": "*" },
+      "unless": { "phase": "P1" },
+      "require": ["pr"],
+      "message": "done with a branch but no pr"
+    }
+  ]
 }

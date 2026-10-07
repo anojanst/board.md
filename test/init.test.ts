@@ -47,20 +47,13 @@ describe('boardmd init', () => {
     expected.columns = expected.columns
       .filter((c: { status?: string }) => c.status)
       .map(({ live: _live, ...c }: { live?: string[] }) => c);
-    // The fixture labels priorities by hand; init can't know "Must" from "P0".
-    delete expected.fields.priority.values;
-    delete expected.fields.size.values;
-    expect(written).toEqual({
-      ...expected,
-      fields: {
-        phase: expected.fields.phase,
-        module: expected.fields.module,
-        priority: expected.fields.priority,
-        size: expected.fields.size,
-        endpoints: expected.fields.endpoints,
-      },
-    });
+    // Rules can't be guessed, and badge labels ("Must" for P0) start as the values themselves.
+    delete expected.rules;
+    expected.fields.priority.values = { P0: 'P0', P1: 'P1', P2: 'P2' };
+    expect(written).toEqual(expected);
+    expect(Object.keys(written.fields.size.values)).toEqual(['S', 'M', 'L']);
     expect(lines.join('\n')).toContain('Found 6 task files in tasks');
+    expect(lines.join('\n')).toContain('new tasks  tasks/<phase folder>/demo-<n>-<slug>.md');
     expect(lines.join('\n')).toContain('live       off: this folder is not in a git repository');
   });
 
@@ -141,15 +134,19 @@ describe('boardmd init', () => {
 
   it('asks before writing, and can be told no', async () => {
     await writeFile(join(dir, 'package.json'), '{ "name": "x" }\n');
-    const prompter = answers('', 'y', 'n');
+    const prompter = answers('', 'y', 'n', 'n', 'n');
     await runInit({ cwd: dir, prompter, runner: fakeRunner({}), log });
     expect(prompter.asked).toEqual([
       'Tasks folder (tasks):',
       'Write boardmd.config.json? (Y/n)',
       'Add a "board" script to package.json? (Y/n)',
+      'Create AGENTS.md with instructions for coding agents? (Y/n)',
+      'Add a Claude Code skill for managing tasks (.claude/skills/boardmd)? (Y/n)',
     ]);
     expect(existsSync(join(dir, 'boardmd.config.json'))).toBe(true);
     expect(await readFile(join(dir, 'package.json'), 'utf8')).toBe('{ "name": "x" }\n');
+    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(dir, '.claude'))).toBe(false);
     expect(lines.at(-1)).toBe('Start the board: npx boardmd serve --open');
   });
 

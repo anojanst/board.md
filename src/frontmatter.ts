@@ -49,38 +49,63 @@ function parseYaml(yaml: string): Record<string, unknown> {
 
 export type ReplaceResult = { ok: true; text: string } | { ok: false; reason: string };
 
+/** A value one frontmatter line can hold. null writes an empty value (`pr:`). */
+export type Scalar = string | number | boolean | null;
+
 /**
  * Replaces the value on a top-level `key: value` line in the frontmatter. The key, the spacing,
  * the quote style, any trailing comment and the line ending are kept, and the rest of the file is
  * untouched. Refuses (rather than guessing) when the line is missing or isn't a one-line scalar.
  */
-export function replaceFrontmatterValue(text: string, key: string, value: string): ReplaceResult {
+export function replaceFrontmatterValue(text: string, key: string, value: Scalar): ReplaceResult {
   const fm = splitFrontmatter(text);
   if (!fm) return { ok: false, reason: 'the file has no frontmatter' };
   const line = findKeyLine(fm, text, key);
   if (!line) return { ok: false, reason: `the frontmatter has no "${key}:" line` };
 
-  const { start, end, prefix, raw } = line;
+  const { start, end, keyPart, prefix, raw } = line;
   const parsed = splitValue(raw);
   if (!parsed) return { ok: false, reason: `"${key}:" is not a one-line value` };
   const { quote, rest } = parsed;
-  const formatted =
-    quote === "'"
-      ? `'${value.replaceAll("'", "''")}'`
-      : quote === '"'
-        ? JSON.stringify(value)
-        : plainSafe(value)
-          ? value
-          : `'${value.replaceAll("'", "''")}'`;
-  // `status:` with no value needs a space before the new one.
-  const spaced = /[ \t]$/.test(prefix) ? prefix : `${prefix} `;
-  const replacement =
-    parsed.value === ''
-      ? `${spaced}${formatted}${rest ? ` ${rest.trimStart()}` : ''}`
-      : `${prefix}${formatted}${rest}`;
-  const out = text.slice(0, start) + replacement + text.slice(end);
+  let replacement: string;
+  if (value === null) {
+    replacement = `${keyPart}${rest ? ` ${rest.trimStart()}` : ''}`;
+  } else {
+    const formatted =
+      typeof value !== 'string'
+        ? String(value)
+        : quote === "'"
+          ? `'${value.replaceAll("'", "''")}'`
+          : quote === '"'
+            ? JSON.stringify(value)
+            : formatScalar(value);
+    // `status:` with no value needs a space before the new one.
+    const spaced = /[ \t]$/.test(prefix) ? prefix : `${prefix} `;
+    replacement =
+      parsed.value === ''
+        ? `${spaced}${formatted}${rest ? ` ${rest.trimStart()}` : ''}`
+        : `${prefix}${formatted}${rest}`;
+  }
+  return verified(fm, text.slice(0, start) + replacement + text.slice(end), key, value);
+}
 
-  // Belt and braces: the new frontmatter must parse, with only this key changed.
+/**
+ * Sets a top-level frontmatter value: rewrites its line, or adds `key: value` as the last line of
+ * the frontmatter when there's no line for it yet.
+ */
+export function setFrontmatterValue(text: string, key: string, value: Scalar): ReplaceResult {
+  const fm = splitFrontmatter(text);
+  if (!fm) return { ok: false, reason: 'the file has no frontmatter' };
+  if (findKeyLine(fm, text, key)) return replaceFrontmatterValue(text, key, value);
+  if (!/^[A-Za-z_][\w-]*$/.test(key)) return { ok: false, reason: `"${key}" isn't a simple key` };
+  const eol = /\r\n/.test(text.slice(0, fm.start)) ? '\r\n' : '\n';
+  const line = value === null ? `${key}:` : `${key}: ${formatScalar(value)}`;
+  const at = fm.start + fm.yaml.length;
+  return verified(fm, text.slice(0, at) + line + eol + text.slice(at), key, value);
+}
+
+/** Belt and braces: the new frontmatter must parse, with only `key` changed. */
+function verified(fm: Frontmatter, out: string, key: string, value: Scalar): ReplaceResult {
   try {
     const before = parseYaml(fm.yaml);
     const after = parseYaml(splitFrontmatter(out)!.yaml);
@@ -90,6 +115,13 @@ export function replaceFrontmatterValue(text: string, key: string, value: string
     return { ok: false, reason: `couldn't change "${key}:" safely` };
   }
   return { ok: true, text: out };
+}
+
+/** A scalar as YAML: plain when that reads back the same, single-quoted otherwise. */
+export function formatScalar(value: Scalar): string {
+  if (value === null) return '';
+  if (typeof value !== 'string') return String(value);
+  return plainSafe(value) ? value : `'${value.replaceAll("'", "''")}'`;
 }
 
 /** True when the frontmatter has a `key:` line that `replaceFrontmatterValue` can rewrite. */
@@ -104,6 +136,8 @@ interface KeyLine {
   start: number;
   /** Offset of the line ending (or the end of the text). */
   end: number;
+  /** `key:`, as written. */
+  keyPart: string;
   /** `key:` plus the spaces after it. */
   prefix: string;
   /** Everything after the prefix, up to the line ending. */
@@ -123,7 +157,7 @@ function findKeyLine(fm: Frontmatter, text: string, key: string): KeyLine | null
     if (m && !(m[2] === '' && m[3] !== '')) {
       const [, keyPart, spaces, raw] = m as unknown as [string, string, string, string];
       const prefix = keyPart + spaces;
-      return { start: pos, end: pos + prefix.length + raw.length, prefix, raw };
+      return { start: pos, end: pos + prefix.length + raw.length, keyPart, prefix, raw };
     }
     pos = lineEnd + 1;
   }

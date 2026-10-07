@@ -20,6 +20,31 @@ export interface FieldConfig {
   filter: boolean;
   swimlane: boolean;
   list: boolean;
+  /** `boardmd check` and `boardmd new` insist on a value. */
+  required: boolean;
+}
+
+/** How `boardmd new` names and places a task file. */
+export interface NewTaskConfig {
+  /** A field whose value picks the subfolder: phase P2 goes in p2-…/. */
+  folderBy?: string;
+  /** File name template: {id}, {id-lower}, {n} and {slug}. `check` enforces it when set. */
+  fileName?: string;
+  /** Values for fields the command line doesn't set. */
+  defaults: Record<string, unknown>;
+  /** Start the body with a "# <id> <title>" heading. */
+  heading: boolean;
+}
+
+/** A value test in a rule: one value, any of a list, "*" for any value, or null for none. */
+export type RuleMatch = string | number | boolean | null | Array<string | number | boolean>;
+
+/** A `boardmd check` rule: tasks matching `if` (and not `unless`) need the `require` fields. */
+export interface CheckRule {
+  if: Record<string, RuleMatch>;
+  unless?: Record<string, RuleMatch>;
+  require: string[];
+  message?: string;
 }
 
 export interface LiveConfig {
@@ -42,6 +67,8 @@ export interface Config {
   columns: ColumnConfig[];
   fields: Record<string, FieldConfig>;
   live?: LiveConfig;
+  newTask: NewTaskConfig;
+  rules: CheckRule[];
   checkCommand?: string;
   afterEditHint?: string;
 }
@@ -111,6 +138,8 @@ export function parseConfig(raw: unknown, source = DEFAULT_CONFIG_FILE): Config 
     'columns',
     'fields',
     'live',
+    'newTask',
+    'rules',
     'checkCommand',
     'afterEditHint',
   ]);
@@ -178,7 +207,15 @@ export function parseConfig(raw: unknown, source = DEFAULT_CONFIG_FILE): Config 
     for (const [name, value] of Object.entries(fieldsRaw)) {
       const key = `fields.${name}`;
       const f = object(value, key, fail);
-      allowKeys(f, `${key}.`, fail, ['label', 'values', 'badge', 'filter', 'swimlane', 'list']);
+      allowKeys(f, `${key}.`, fail, [
+        'label',
+        'values',
+        'badge',
+        'filter',
+        'swimlane',
+        'list',
+        'required',
+      ]);
       let values: Record<string, string> | undefined;
       if (f.values !== undefined) {
         values = {};
@@ -199,6 +236,7 @@ export function parseConfig(raw: unknown, source = DEFAULT_CONFIG_FILE): Config 
         filter,
         swimlane,
         list,
+        required: optionalBoolean(f.required, `${key}.required`, fail) ?? false,
       };
     }
     const lanes = Object.keys(fields).filter((k) => fields[k]!.swimlane);
@@ -248,6 +286,52 @@ export function parseConfig(raw: unknown, source = DEFAULT_CONFIG_FILE): Config 
     };
   }
 
+  const newTask: NewTaskConfig = { defaults: {}, heading: true };
+  if (root.newTask !== undefined) {
+    const n = object(root.newTask, 'newTask', fail);
+    allowKeys(n, 'newTask.', fail, ['folderBy', 'fileName', 'defaults', 'heading']);
+    const folderBy = optionalString(n.folderBy, 'newTask.folderBy', fail);
+    if (folderBy !== undefined) newTask.folderBy = folderBy;
+    const fileName = optionalString(n.fileName, 'newTask.fileName', fail);
+    if (fileName !== undefined) {
+      if (!/\{(id|id-lower|n)\}/.test(fileName))
+        fail('newTask.fileName', 'must contain {id}, {id-lower} or {n}, e.g. "{id-lower}-{slug}.md"');
+      if (!fileName.endsWith('.md')) fail('newTask.fileName', 'must end with .md');
+      if (/[\\/]/.test(fileName)) fail('newTask.fileName', 'is a file name, not a path (use folderBy)');
+      newTask.fileName = fileName;
+    }
+    if (n.defaults !== undefined) newTask.defaults = object(n.defaults, 'newTask.defaults', fail);
+    newTask.heading = optionalBoolean(n.heading, 'newTask.heading', fail) ?? true;
+  }
+
+  const rules: CheckRule[] = [];
+  if (root.rules !== undefined) {
+    if (!Array.isArray(root.rules)) fail('rules', 'must be an array');
+    (root.rules as unknown[]).forEach((r, i) => {
+      const key = `rules[${i}]`;
+      const rule = object(r, key, fail);
+      allowKeys(rule, `${key}.`, fail, ['if', 'unless', 'require', 'message']);
+      const matches = (value: unknown, k: string) => {
+        const m = object(value, k, fail);
+        for (const [field, test] of Object.entries(m)) {
+          const ok = (v: unknown) => ['string', 'number', 'boolean'].includes(typeof v);
+          if (test !== null && !ok(test) && !(Array.isArray(test) && test.every(ok)))
+            fail(`${k}.${field}`, 'must be a value, a list of values, "*" or null');
+        }
+        return m as Record<string, RuleMatch>;
+      };
+      const require = stringList(rule.require, `${key}.require`, fail);
+      if (!require.length) fail(`${key}.require`, 'must list at least one field');
+      const message = optionalString(rule.message, `${key}.message`, fail);
+      rules.push({
+        if: matches(rule.if, `${key}.if`),
+        ...(rule.unless === undefined ? {} : { unless: matches(rule.unless, `${key}.unless`) }),
+        require,
+        ...(message === undefined ? {} : { message }),
+      });
+    });
+  }
+
   const checkCommand = optionalString(root.checkCommand, 'checkCommand', fail);
   const afterEditHint = optionalString(root.afterEditHint, 'afterEditHint', fail);
 
@@ -260,6 +344,8 @@ export function parseConfig(raw: unknown, source = DEFAULT_CONFIG_FILE): Config 
     columns,
     fields,
     ...(live ? { live } : {}),
+    newTask,
+    rules,
     ...(checkCommand === undefined ? {} : { checkCommand }),
     ...(afterEditHint === undefined ? {} : { afterEditHint }),
   };

@@ -5,7 +5,9 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { DEFAULT_CONFIG_FILE, loadConfig, parseConfig } from './config.js';
+import { folderMatches as folderMatchesValue } from './check.js';
 import { parseFrontmatter } from './frontmatter.js';
+import { installAgentFiles } from './guide.js';
 import { defaultRunner, type Runner } from './live.js';
 import { readTasks } from './tasks.js';
 
@@ -55,6 +57,7 @@ const MAX_FILE_BYTES = 256 * 1024;
 interface TaskFile {
   absPath: string;
   data: Record<string, unknown>;
+  body?: string;
 }
 
 /** Markdown files under `root` whose frontmatter has a status. */
@@ -72,8 +75,8 @@ export async function findTaskFiles(root: string): Promise<TaskFile[]> {
         const info = await stat(path).catch(() => null);
         if (!info || info.size > MAX_FILE_BYTES) continue;
         try {
-          const { data } = parseFrontmatter(await readFile(path, 'utf8'));
-          if (statusKey(data)) found.push({ absPath: path, data });
+          const { data, body } = parseFrontmatter(await readFile(path, 'utf8'));
+          if (statusKey(data)) found.push({ absPath: path, data, body });
         } catch {
           // Not a task file.
         }
@@ -336,7 +339,17 @@ export function planConfig(
         key,
       )
     ) {
-      fields[key] = { label: humanize(key), badge: true };
+      // A short set of badge values becomes the allowed list (rename them to labels later).
+      const sizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'];
+      const rank = (v: string) => sizes.indexOf(v.toUpperCase());
+      const distinctValues = [...new Set(values.map(String))].sort((a, b) =>
+        rank(a) >= 0 && rank(b) >= 0
+          ? rank(a) - rank(b)
+          : a.localeCompare(b, undefined, { numeric: true }),
+      );
+      const allowed =
+        distinctValues.length <= 8 ? Object.fromEntries(distinctValues.map((v) => [v, v])) : null;
+      fields[key] = { label: humanize(key), badge: true, ...(allowed ? { values: allowed } : {}) };
       roles.badges!.push(key);
     } else if (
       !roles.swimlanes!.length &&
@@ -351,15 +364,53 @@ export function planConfig(
     }
   }
 
+  // Fields every file fills in are required, so `check` and `new` insist on them.
+  for (const [key, field] of Object.entries(fields)) {
+    const present = field.list
+      ? tasks.every((t) => Array.isArray(t[key]))
+      : tasks.every((t) => !isBlank(t[key]));
+    if (n > 1 && present) field.required = true;
+  }
+
+  // How new task files are named and placed, copied from the existing ones.
+  const newTask: Record<string, unknown> = {};
+  const lane = roles.swimlanes![0];
+  if (
+    lane &&
+    inDir.length &&
+    inDir.every((f) => {
+      const [folder, ...rest] = relative(tasksDir, f.absPath).split(sep);
+      return (
+        rest.length > 0 &&
+        !isBlank(f.data[lane]) &&
+        folderMatchesValue(folder!, String(f.data[lane]))
+      );
+    })
+  )
+    newTask.folderBy = lane;
+  const named = (make: (id: string) => string) =>
+    inDir.length > 0 &&
+    inDir.every(
+      (f) =>
+        !isBlank(f.data[idField]) && basename(f.absPath).startsWith(make(String(f.data[idField]))),
+    );
+  if (named((v) => `${v.toLowerCase()}-`)) newTask.fileName = '{id-lower}-{slug}.md';
+  else if (named((v) => `${v}-`)) newTask.fileName = '{id}-{slug}.md';
+  const headed = inDir.filter((f) =>
+    f.body?.trimStart().startsWith(`# ${String(f.data[idField])}`),
+  ).length;
+  if (inDir.length && headed < inDir.length / 2) newTask.heading = false;
+
   const ignoreStatuses = statuses.filter((s) => statusRank(s) >= 6);
   const config: Record<string, unknown> = {
-    tasksDir: relative(configRoot, tasksDir).split(sep).join('/') || '.',
+    tasksDir: displayDir(configRoot, tasksDir),
     id,
     titleField,
     statusField,
     statuses,
     columns,
     ...(Object.keys(fields).length ? { fields } : {}),
+    ...(Object.keys(newTask).length ? { newTask } : {}),
     ...(live
       ? {
           live: {
@@ -375,6 +426,14 @@ export function planConfig(
   };
 
   if (idExample) summary.push(`ids        ${idExample} (the "${idField}" field)`);
+  if (id.template) {
+    const folder = newTask.folderBy ? `<${newTask.folderBy} folder>/` : '';
+    const file = String(newTask.fileName ?? '{id-lower}-{slug}.md')
+      .replace('{id-lower}', id.template.toLowerCase().replace('{n}', '<n>'))
+      .replace('{id}', id.template.replace('{n}', '<n>'))
+      .replace('{slug}', '<slug>');
+    summary.push(`new tasks  ${displayDir(configRoot, tasksDir)}/${folder}${file}`);
+  }
   summary.push(
     `statuses   ${statuses.join(', ')}${found.length ? '' : ' (none found yet; edit as you like)'}`,
   );
@@ -413,6 +472,10 @@ export function planConfig(
     hints.push('To show branch and PR state, add a "live" section (see the README).');
   }
   return { config, summary, hints };
+}
+
+function displayDir(configRoot: string, tasksDir: string): string {
+  return relative(configRoot, tasksDir).split(sep).join('/') || '.';
 }
 
 /**
@@ -582,6 +645,7 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
   for (const hint of plan.hints) log(`  Tip: ${hint}`);
 
   const run = await addScript(configRoot, yes, log);
+  await installAgentFiles(loaded, tasks, { yes, log, ...(options.force ? { force: true } : {}) });
   log('');
   if (!options.thenServe) log(`Start the board: ${run}`);
   return { code: 0, configPath };

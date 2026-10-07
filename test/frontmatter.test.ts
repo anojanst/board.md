@@ -3,6 +3,7 @@ import {
   hasEditableLine,
   parseFrontmatter,
   replaceFrontmatterValue,
+  setFrontmatterValue,
   splitFrontmatter,
 } from '../src/frontmatter.js';
 
@@ -104,6 +105,28 @@ describe('replaceFrontmatterValue', () => {
 
   it('refuses a file without frontmatter', () => {
     expect(replaceFrontmatterValue('# Just a note\n', 'status', 'done').ok).toBe(false);
+  });
+});
+
+describe('setFrontmatterValue', () => {
+  const set = (text: string, key: string, value: string | number | null) => {
+    const result = setFrontmatterValue(text, key, value);
+    if (!result.ok) throw new Error(result.reason);
+    return result.text;
+  };
+
+  it('writes numbers and empty values on their one line', () => {
+    expect(changedLines(TASK, set(TASK, 'pr', 41))).toEqual([['pr:', 'pr: 41']]);
+    const withBranch = set(TASK, 'branch', 'task/demo-4-x');
+    expect(changedLines(withBranch, set(withBranch, 'branch', null))).toEqual([['branch: task/demo-4-x', 'branch:']]);
+    expect(parseFrontmatter(set(TASK, 'pr', 41)).data.pr).toBe(41);
+  });
+
+  it('adds a missing key as the last frontmatter line, with the file\'s line endings', () => {
+    expect(set(TASK, 'reviewer', 'sam')).toBe(TASK.replace('pr:\n---', 'pr:\nreviewer: sam\n---'));
+    const crlf = TASK.replaceAll('\n', '\r\n');
+    expect(set(crlf, 'reviewer', 'sam')).toBe(crlf.replace('pr:\r\n---', 'pr:\r\nreviewer: sam\r\n---'));
+    expect(setFrontmatterValue(TASK, 'bad key', 'x').ok).toBe(false);
   });
 });
 
