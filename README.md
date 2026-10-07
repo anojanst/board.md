@@ -18,15 +18,56 @@ in whatever shape you already use. A small config file tells the board which fie
 It suits repos where a coding agent keeps the task files: the board reads the agent's files as
 they are and shows its branches and pull requests as they happen.
 
-## Install and run
+## Quick start
 
-Node 20 or later. git and the [GitHub CLI](https://cli.github.com) (`gh`, signed in) are optional:
-without them the board still works, without live state.
+You need Node 20 or later. git and the [GitHub CLI](https://cli.github.com) (`gh`, signed in) are
+optional: without them the board still works, just without branch and PR state.
+
+**1. Install it** as a dev dependency of your repo:
 
 ```bash
 npm install --save-dev board.md
+```
+
+With pnpm, use `pnpm add -D board.md` (add `-w` at the root of a pnpm workspace).
+
+**2. Add `boardmd.config.json`** at the root of your repo. This is the smallest config that works.
+Point `tasksDir` at your task files, and list the statuses your files use:
+
+```json
+{
+  "tasksDir": "docs/tasks",
+  "id": { "field": "id" },
+  "statuses": ["todo", "in-progress", "done"],
+  "columns": [
+    { "name": "Todo", "status": "todo" },
+    { "name": "In progress", "status": "in-progress" },
+    { "name": "Done", "status": "done" }
+  ]
+}
+```
+
+[Configuration](#configuration) covers the rest: badges, filters, swimlanes, and the `live` section
+that turns on branch and PR state.
+
+**3. Start the board** from the repo root:
+
+```bash
 npx boardmd serve --open
 ```
+
+It prints the address (http://127.0.0.1:4600) and opens it in your browser. Stop it with
+<kbd>Ctrl</kbd>+<kbd>C</kbd>. The page updates by itself while it runs, so you can leave it open.
+
+**4. Optionally, add a script** to your `package.json`, so `npm run board` starts it:
+
+```json
+"scripts": {
+  "board": "boardmd serve --open"
+}
+```
+
+### Options
 
 ```
 boardmd serve [--port 4600] [--open] [--offline] [--config boardmd.config.json]
@@ -38,6 +79,15 @@ boardmd serve [--port 4600] [--open] [--offline] [--config boardmd.config.json]
 ```
 
 The server listens on 127.0.0.1 only.
+
+### If it doesn't start
+
+- `config file not found`: run it from the folder that has `boardmd.config.json`, or pass
+  `--config path/to/boardmd.config.json`.
+- `boardmd.config.json: columns[2].status: ...`: the message names the key to fix.
+- `Port 4600 is already in use`: another board (or app) is running; use `--port 4601`.
+- Cards are missing: files that couldn't be read are listed at the top of the page, with the
+  reason.
 
 ## Task files
 
