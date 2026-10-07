@@ -60,6 +60,13 @@ export const DEFAULT_CONFIG_FILE = 'boardmd.config.json';
 
 export class ConfigError extends Error {
   override name = 'ConfigError';
+  constructor(
+    message: string,
+    /** The config file doesn't exist. */
+    readonly notFound = false,
+  ) {
+    super(message);
+  }
 }
 
 export async function loadConfig(path = DEFAULT_CONFIG_FILE): Promise<LoadedConfig> {
@@ -69,11 +76,12 @@ export async function loadConfig(path = DEFAULT_CONFIG_FILE): Promise<LoadedConf
     text = await readFile(abs, 'utf8');
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    throw new ConfigError(
-      code === 'ENOENT'
-        ? `${path}: config file not found. Create it, or pass --config <file>.`
-        : `${path}: ${(error as Error).message}`,
-    );
+    if (code === 'ENOENT')
+      throw new ConfigError(
+        `${path}: config file not found. Run boardmd init to create one, or pass --config <file>.`,
+        true,
+      );
+    throw new ConfigError(`${path}: ${(error as Error).message}`);
   }
   let raw: unknown;
   try {

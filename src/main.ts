@@ -4,6 +4,7 @@ import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { parseArgs } from 'node:util';
 import { ConfigError, DEFAULT_CONFIG_FILE, loadConfig } from './config.js';
+import { runInit, terminalPrompter } from './init.js';
 import { DEFAULT_PORT, startServer } from './server.js';
 import { readTasks } from './tasks.js';
 
@@ -12,18 +13,23 @@ const { version } = createRequire(import.meta.url)('../package.json') as { versi
 const HELP = `boardmd ${version}
 
 Usage:
+  boardmd init  [--yes] [--force] [--tasks-dir <folder>] [--config ${DEFAULT_CONFIG_FILE}]
   boardmd serve [--port ${DEFAULT_PORT}] [--open] [--offline] [--config ${DEFAULT_CONFIG_FILE}]
 
 Commands:
+  init           Look at your task files and write ${DEFAULT_CONFIG_FILE}
   serve          Serve the board on http://127.0.0.1:${DEFAULT_PORT}
 
 Options:
-  -p, --port     Port to listen on (default ${DEFAULT_PORT})
-  -o, --open     Open the board in a browser
-      --offline  Skip git branch and GitHub PR lookups
-  -c, --config   Config file (default ${DEFAULT_CONFIG_FILE})
-  -h, --help     Show this help
-  -v, --version  Show the version
+  -y, --yes        init: accept every suggestion without asking
+      --force      init: replace an existing config
+      --tasks-dir  init: the folder that holds the task files (found by itself otherwise)
+  -p, --port       serve: port to listen on (default ${DEFAULT_PORT})
+  -o, --open       serve: open the board in a browser
+      --offline    serve: skip git branch and GitHub PR lookups
+  -c, --config     Config file (default ${DEFAULT_CONFIG_FILE})
+  -h, --help       Show this help
+  -v, --version    Show the version
 `;
 
 export async function main(argv: string[]): Promise<number> {
@@ -40,6 +46,9 @@ export async function main(argv: string[]): Promise<number> {
         open: { type: 'boolean', short: 'o' },
         offline: { type: 'boolean' },
         config: { type: 'string', short: 'c' },
+        yes: { type: 'boolean', short: 'y' },
+        force: { type: 'boolean' },
+        'tasks-dir': { type: 'string' },
       },
     });
   } catch (error) {
@@ -57,7 +66,7 @@ export async function main(argv: string[]): Promise<number> {
     console.log(HELP);
     return 0;
   }
-  if (command !== 'serve') {
+  if (command !== 'serve' && command !== 'init') {
     console.error(`Unknown command: ${command}\n\n${HELP}`);
     return 1;
   }
@@ -66,25 +75,50 @@ export async function main(argv: string[]): Promise<number> {
     return 1;
   }
 
+  if (command === 'init') {
+    const prompter = interactive() && !values.yes ? terminalPrompter() : undefined;
+    try {
+      const { code } = await runInit({
+        ...(values.config ? { config: values.config } : {}),
+        ...(values['tasks-dir'] ? { tasksDir: values['tasks-dir'] } : {}),
+        yes: values.yes ?? false,
+        force: values.force ?? false,
+        ...(prompter ? { prompter } : {}),
+      });
+      return code;
+    } catch (error) {
+      if (error instanceof ConfigError) {
+        console.error(error.message);
+        return 1;
+      }
+      throw error;
+    } finally {
+      prompter?.close();
+    }
+  }
+
   const port = values.port === undefined ? DEFAULT_PORT : Number(values.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
     console.error(`--port must be a number from 0 to 65535, not "${values.port}".`);
     return 1;
   }
 
+  const configPath = values.config ?? DEFAULT_CONFIG_FILE;
   let loaded;
   try {
-    loaded = await loadConfig(values.config ?? DEFAULT_CONFIG_FILE);
+    loaded = await loadConfig(configPath);
   } catch (error) {
-    if (error instanceof ConfigError) {
+    if (!(error instanceof ConfigError)) throw error;
+    // No config yet: offer to set one up, then carry on serving.
+    if (!(error.notFound && values.config === undefined && interactive() && (await setUpFirst()))) {
       console.error(error.message);
       return 1;
     }
-    throw error;
+    loaded = await loadConfig(configPath);
   }
   const dirStat = await stat(loaded.tasksDir).catch(() => null);
   if (!dirStat?.isDirectory()) {
-    console.error(`${values.config ?? DEFAULT_CONFIG_FILE}: tasksDir: ${loaded.tasksDir} is not a folder.`);
+    console.error(`${configPath}: tasksDir: ${loaded.tasksDir} is not a folder.`);
     return 1;
   }
 
@@ -108,6 +142,23 @@ export async function main(argv: string[]): Promise<number> {
   console.log('Press Ctrl+C to stop.');
   if (values.open) openBrowser(server.url);
   return 0;
+}
+
+function interactive(): boolean {
+  return !!process.stdin.isTTY && !!process.stdout.isTTY;
+}
+
+/** Asks whether to run init before serving. True when a config was written. */
+async function setUpFirst(): Promise<boolean> {
+  const prompter = terminalPrompter();
+  try {
+    const answer = await prompter.ask(`No ${DEFAULT_CONFIG_FILE} here yet. Set one up now? (Y/n) `, 'y');
+    if (!/^y/i.test(answer)) return false;
+    const { code } = await runInit({ prompter, thenServe: true });
+    return code === 0;
+  } finally {
+    prompter.close();
+  }
 }
 
 function openBrowser(url: string): void {

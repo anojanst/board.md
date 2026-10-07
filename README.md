@@ -31,59 +31,73 @@ npm install --save-dev board.md
 
 With pnpm, use `pnpm add -D board.md` (add `-w` at the root of a pnpm workspace).
 
-**2. Add `boardmd.config.json`** at the root of your repo. This is the smallest config that works.
-Point `tasksDir` at your task files, and list the statuses your files use:
-
-```json
-{
-  "tasksDir": "docs/tasks",
-  "id": { "field": "id" },
-  "statuses": ["todo", "in-progress", "done"],
-  "columns": [
-    { "name": "Todo", "status": "todo" },
-    { "name": "In progress", "status": "in-progress" },
-    { "name": "Done", "status": "done" }
-  ]
-}
-```
-
-[Configuration](#configuration) covers the rest: badges, filters, swimlanes, and the `live` section
-that turns on branch and PR state.
-
-**3. Start the board** from the repo root:
+**2. Set it up** from the root of your repo:
 
 ```bash
-npx boardmd serve --open
+npx boardmd init
 ```
 
-It prints the address (http://127.0.0.1:4600) and opens it in your browser. Stop it with
-<kbd>Ctrl</kbd>+<kbd>C</kbd>. The page updates by itself while it runs, so you can leave it open.
-
-**4. Optionally, add a script** to your `package.json`, so `npm run board` starts it:
-
-```json
-"scripts": {
-  "board": "boardmd serve --open"
-}
-```
-
-### Options
+It finds your task files, works out a config from them, shows you what it found, and asks before
+writing anything:
 
 ```
+Found 88 task files in docs/project/tasks
+  ids        TUI-1 … TUI-88 (the "id" field)
+  statuses   todo, in-progress, blocked, done, deferred
+  columns    Todo · In progress · In review · Blocked · Done · Deferred
+  fields     phase (swimlanes); priority, size (badges); module (filters); endpoints (lists)
+  live       branches like task/tui-12-…, PRs from gh, base branch main (2 local branches match now)
+
+Tasks folder (docs/project/tasks):
+Write boardmd.config.json? (Y/n)
+Add a "board" script to package.json? (Y/n)
+```
+
+- **Task folder:** the folder holding your task files (markdown with a `status` in the frontmatter).
+  Type another path to use a different one.
+- **Columns:** one per status found, in a sensible order (todo, then in progress, then done and
+  deferred). In a git repo it adds live state, plus an "In review" column for open PRs.
+- **Fields:** priority and size become card badges, phase or milestone becomes the swimlane, and
+  other short repeated values (such as module) become filters.
+- **Starting from nothing:** with no task files yet, it offers to create `tasks/` with an example
+  task.
+
+`boardmd init --yes` takes every suggestion without asking, and `--tasks-dir <folder>` skips the
+search. The result is a plain [`boardmd.config.json`](#configuration) you can edit, for example to
+give values display labels.
+
+**3. Start the board:**
+
+```bash
+npm run board
+```
+
+Without the script, run `npx boardmd serve --open`. It prints the address
+(http://127.0.0.1:4600) and opens it in your browser. Stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>.
+The page updates by itself while it runs, so you can leave it open. If you start it before running
+`init`, it offers to set things up first.
+
+### Commands
+
+```
+boardmd init  [--yes] [--force] [--tasks-dir <folder>] [--config boardmd.config.json]
 boardmd serve [--port 4600] [--open] [--offline] [--config boardmd.config.json]
 
-  -p, --port     Port to listen on (default 4600)
-  -o, --open     Open the board in a browser
-      --offline  Skip git branch and GitHub PR lookups
-  -c, --config   Config file (default boardmd.config.json)
+  -y, --yes        init: accept every suggestion without asking
+      --force      init: replace an existing config
+      --tasks-dir  init: the folder that holds the task files (found by itself otherwise)
+  -p, --port       serve: port to listen on (default 4600)
+  -o, --open       serve: open the board in a browser
+      --offline    serve: skip git branch and GitHub PR lookups
+  -c, --config     Config file (default boardmd.config.json)
 ```
 
 The server listens on 127.0.0.1 only.
 
 ### If it doesn't start
 
-- `config file not found`: run it from the folder that has `boardmd.config.json`, or pass
-  `--config path/to/boardmd.config.json`.
+- `config file not found`: run `npx boardmd init`, run it from the folder that has
+  `boardmd.config.json`, or pass `--config path/to/boardmd.config.json`.
 - `boardmd.config.json: columns[2].status: ...`: the message names the key to fix.
 - `Port 4600 is already in use`: another board (or app) is running; use `--port 4601`.
 - Cards are missing: files that couldn't be read are listed at the top of the page, with the
@@ -118,8 +132,26 @@ another file are listed as invalid at the top of the page instead of stopping th
 
 ## Configuration
 
-`boardmd.config.json`, at the root of your repo. It's JSON rather than JavaScript, so loading it
-never runs code. The board checks it at startup and names the bad key if something is wrong.
+`boardmd.config.json`, at the root of your repo. `boardmd init` writes one for you. It's JSON
+rather than JavaScript, so loading it never runs code. The board checks it at startup and names the
+bad key if something is wrong.
+
+The smallest config that works:
+
+```json
+{
+  "tasksDir": "docs/tasks",
+  "id": { "field": "id" },
+  "statuses": ["todo", "in-progress", "done"],
+  "columns": [
+    { "name": "Todo", "status": "todo" },
+    { "name": "In progress", "status": "in-progress" },
+    { "name": "Done", "status": "done" }
+  ]
+}
+```
+
+A full one, with every section:
 
 ```json
 {

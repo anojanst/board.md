@@ -36,10 +36,10 @@ describe('parseConfig', () => {
     const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
     const block = (after: string) =>
       JSON.parse(new RegExp(`${after}[\\s\\S]*?\`\`\`json\\n([\\s\\S]*?)\`\`\``).exec(readme)![1]!);
-    const minimal = parseConfig(block('Add `boardmd\\.config\\.json`'));
+    const minimal = parseConfig(block('The smallest config that works'));
     expect(minimal.columns).toHaveLength(3);
     expect(minimal.live).toBeUndefined();
-    expect(parseConfig(block('## Configuration')).live?.baseBranch).toBe('main');
+    expect(parseConfig(block('A full one, with every section')).live?.baseBranch).toBe('main');
   });
 
   it('names the bad key', async () => {
