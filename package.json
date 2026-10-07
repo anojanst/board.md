@@ -1,6 +1,6 @@
 {
   "name": "board.md",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "A local web board for the markdown task files already in your repo, with live git branch and pull request state.",
   "keywords": [
     "kanban",
