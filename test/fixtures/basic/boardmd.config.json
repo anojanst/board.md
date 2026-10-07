@@ -1,0 +1,30 @@
+{
+  "tasksDir": "tasks",
+  "id": { "field": "id", "pattern": "^DEMO-(\\d+)$", "template": "DEMO-{n}" },
+  "titleField": "title",
+  "statusField": "status",
+  "statuses": ["todo", "in-progress", "blocked", "done", "deferred"],
+  "columns": [
+    { "name": "Todo", "status": "todo" },
+    { "name": "In progress", "status": "in-progress", "live": ["in-progress"] },
+    { "name": "In review", "live": ["in-review"] },
+    { "name": "Blocked", "status": "blocked" },
+    { "name": "Done", "status": "done" },
+    { "name": "Deferred", "status": "deferred", "collapsed": true }
+  ],
+  "fields": {
+    "phase": { "label": "Phase", "swimlane": true, "values": { "P1": "Foundation", "P2": "Features" } },
+    "module": { "label": "Module", "filter": true },
+    "priority": { "label": "Priority", "badge": true, "values": { "P0": "Must", "P1": "Should", "P2": "Could" } },
+    "size": { "label": "Size", "badge": true, "values": { "S": "S", "M": "M", "L": "L" } },
+    "endpoints": { "label": "Endpoints", "list": true }
+  },
+  "live": {
+    "baseBranch": "main",
+    "branchPattern": "^(?:task|docs|fix)/demo-(\\d+(?:-\\d+)*)-[a-z]",
+    "rangePrefixes": ["docs/"],
+    "branchField": "branch",
+    "prField": "pr",
+    "ignoreStatuses": ["done", "deferred"]
+  }
+}
