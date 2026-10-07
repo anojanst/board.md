@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="boardmd-token" content="%TOKEN%" />
+    <meta name="color-scheme" content="light dark" />
+    <title>%TITLE%</title>
+    <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img src="/assets/icon.svg" alt="" width="20" height="20" />
+        <div class="brand-text">
+          <strong id="project-name">board.md</strong>
+          <span id="tasks-dir" class="muted"></span>
+        </div>
+      </div>
+      <span id="branch" class="chip" hidden></span>
+      <div class="controls" role="search">
+        <label class="search">
+          <span class="visually-hidden">Search tasks</span>
+          <input id="search" type="search" placeholder="Search  /" autocomplete="off" spellcheck="false" />
+        </label>
+        <div id="filters" class="filters"></div>
+        <label id="lanes-toggle" class="toggle" hidden>
+          <input id="lanes" type="checkbox" />
+          <span id="lanes-label">Swimlanes</span>
+        </label>
+        <button id="clear-filters" class="button ghost" type="button" hidden>Clear</button>
+        <button id="refresh" class="button" type="button" title="Fetch branch and PR state again">
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <section id="notices" class="notices" aria-live="polite"></section>
+
+    <main id="board" class="board" aria-label="Board" aria-busy="true">
+      <p class="loading muted">Loading the board…</p>
+    </main>
+
+    <aside id="panel" class="panel" aria-label="Task details" hidden></aside>
+
+    <div id="menu" class="menu" role="menu" hidden></div>
+
+    <dialog id="confirm" class="dialog">
+      <form method="dialog">
+        <p id="confirm-text"></p>
+        <div class="dialog-actions">
+          <button class="button ghost" value="cancel" type="submit">Cancel</button>
+          <button class="button primary" value="ok" type="submit">Move it</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+  </body>
+</html>
