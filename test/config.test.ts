@@ -32,6 +32,16 @@ describe('parseConfig', () => {
     expect(config.live?.branchPattern.test('task/demo-1-x')).toBe(true);
   });
 
+  it('accepts the configs shown in the README', async () => {
+    const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+    const block = (after: string) =>
+      JSON.parse(new RegExp(`${after}[\\s\\S]*?\`\`\`json\\n([\\s\\S]*?)\`\`\``).exec(readme)![1]!);
+    const minimal = parseConfig(block('Add `boardmd\\.config\\.json`'));
+    expect(minimal.columns).toHaveLength(3);
+    expect(minimal.live).toBeUndefined();
+    expect(parseConfig(block('## Configuration')).live?.baseBranch).toBe('main');
+  });
+
   it('names the bad key', async () => {
     const base = await valid();
     const cases: Array<[Record<string, unknown>, string]> = [
