@@ -9,8 +9,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      # Let every Node version report its own result.
+      fail-fast: false
       matrix:
-        node: [20, 22, 24]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -22,3 +24,23 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - run: node test/smoke.mjs
+
+  # The package supports Node 20, but pnpm 11 and Vitest 5 need Node 22 or later. So this job
+  # installs and builds on Node 24, then runs the built CLI on Node 20.
+  node20:
+    name: smoke (20)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node test/smoke.mjs

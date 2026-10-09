@@ -310,11 +310,15 @@ The server writes files, so even on localhost it:
 
 ## Development
 
+Working on board.md needs Node 22 or later (pnpm 11 and Vitest 5 do), though the package itself
+runs on Node 20.
+
 ```bash
 pnpm install
-pnpm test        # Vitest
+pnpm test             # Vitest
 pnpm typecheck
-pnpm build       # dist/cli.js and dist/web/
+pnpm build            # dist/cli.js and dist/web/
+node test/smoke.mjs   # the built CLI on a copy of the test project; CI runs it on Node 20 too
 ```
 
 The page is plain JavaScript and CSS in `src/web/`, copied into `dist/web/` by the build, so
