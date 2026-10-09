@@ -563,10 +563,13 @@ body.is-dragging .cell.drop-ok {
   box-shadow: inset 0 0 0 2px var(--accent-soft);
 }
 
-body.is-dragging .cell.drop-ok.drop-hover,
-body.is-dragging .col-head.drop-ok.drop-hover .col-name {
+body.is-dragging .cell.drop-ok.drop-hover {
   background: var(--column-drop);
   box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+body.is-dragging .col-head.drop-ok.drop-hover .col-name {
+  color: var(--accent);
 }
 
 body.is-dragging .cell:not(.drop-ok) {

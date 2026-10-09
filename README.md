@@ -3,7 +3,7 @@
 A local web board for the markdown task files already in your repo, with live git branch and pull
 request state.
 
-![The board: tasks in columns by status, with a branch badge on an in-progress card and an approved PR on a card in review](docs/board.png)
+![Demo: a card dragged from Todo to In progress changes one line in its file; boardmd new creates a task and its card appears on the board; the task's detail panel shows its frontmatter and notes](docs/demo.gif)
 
 board.md is a tool, not a file format. You keep one markdown file per task, with YAML frontmatter
 in whatever shape you already use. A small config file tells the board which fields mean what, and
