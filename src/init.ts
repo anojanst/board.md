@@ -620,7 +620,9 @@ export async function runInit(options: InitOptions = {}): Promise<InitResult> {
       );
     log('');
     if (created || options.tasksDir || !prompter) break;
-    const answer = await ask(`Tasks folder (${shown}): `, shown);
+    if (await yes(`Use ${shown} as the tasks folder?`)) break;
+    let answer = '';
+    while (!answer) answer = (await ask('Tasks folder (a path from here): ', '')).trim();
     const chosen = resolve(cwd, answer);
     if (chosen === tasksDir) break;
     if (!(await stat(chosen).catch(() => null))?.isDirectory()) {

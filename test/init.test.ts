@@ -137,7 +137,7 @@ describe('boardmd init', () => {
     const prompter = answers('', 'y', 'n', 'n', 'n');
     await runInit({ cwd: dir, prompter, runner: fakeRunner({}), log });
     expect(prompter.asked).toEqual([
-      'Tasks folder (tasks):',
+      'Use tasks as the tasks folder? (Y/n)',
       'Write boardmd.config.json? (Y/n)',
       'Add a "board" script to package.json? (Y/n)',
       'Create AGENTS.md with instructions for coding agents? (Y/n)',
@@ -151,7 +151,7 @@ describe('boardmd init', () => {
   });
 
   it('lets the user pick another folder', async () => {
-    const prompter = answers('tasks/p2-features', '', 'y');
+    const prompter = answers('n', 'tasks/p2-features', '', 'y');
     await runInit({ cwd: dir, prompter, runner: fakeRunner({}), log });
     expect((await config()).tasksDir).toBe('tasks/p2-features');
     expect(lines.join('\n')).toContain('Found 3 task files in tasks/p2-features');

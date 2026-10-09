@@ -46,18 +46,21 @@ writing anything:
 ```
 Found 88 task files in docs/project/tasks
   ids        TUI-1 … TUI-88 (the "id" field)
+  new tasks  docs/project/tasks/<phase folder>/tui-<n>-<slug>.md
   statuses   todo, in-progress, blocked, done, deferred
   columns    Todo · In progress · In review · Blocked · Done · Deferred
   fields     phase (swimlanes); priority, size (badges); module (filters); endpoints (lists)
   live       branches like task/tui-12-…, PRs from gh, base branch main (2 local branches match now)
 
-Tasks folder (docs/project/tasks):
+Use docs/project/tasks as the tasks folder? (Y/n)
 Write boardmd.config.json? (Y/n)
 Add a "board" script to package.json? (Y/n)
+Add a board.md section to CLAUDE.md for coding agents? (Y/n)
+Add a Claude Code skill for managing tasks (.claude/skills/boardmd)? (Y/n)
 ```
 
 - **Task folder:** the folder holding your task files (markdown with a `status` in the frontmatter).
-  Type another path to use a different one.
+  Answer `n` to give another path.
 - **Columns:** one per status found, in a sensible order (todo, then in progress, then done and
   deferred). In a git repo it adds live state, plus an "In review" column for open PRs.
 - **Fields:** priority and size become card badges, phase or milestone becomes the swimlane, and
