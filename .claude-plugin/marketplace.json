@@ -1,0 +1,15 @@
+{
+  "name": "board-md",
+  "description": "board.md: a local board for the markdown task files in your repo",
+  "owner": {
+    "name": "Anojan ST",
+    "url": "https://github.com/anojanst"
+  },
+  "plugins": [
+    {
+      "name": "boardmd",
+      "source": "./plugins/boardmd",
+      "description": "Set up board.md in a repo, open its task board, and read, create and update markdown task files safely"
+    }
+  ]
+}

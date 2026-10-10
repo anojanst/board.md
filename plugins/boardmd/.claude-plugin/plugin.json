@@ -1,0 +1,14 @@
+{
+  "name": "boardmd",
+  "displayName": "board.md",
+  "version": "1.0.0",
+  "description": "Set up board.md in a repo, open its task board, and read, create and update markdown task files safely",
+  "author": {
+    "name": "Anojan ST",
+    "url": "https://github.com/anojanst"
+  },
+  "homepage": "https://github.com/anojanst/board.md#readme",
+  "repository": "https://github.com/anojanst/board.md",
+  "license": "MIT",
+  "keywords": ["tasks", "kanban", "markdown", "board", "project-management"]
+}

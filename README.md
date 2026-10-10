@@ -146,6 +146,24 @@ section is replaced in place, and the rest of the file is left alone.
 
 The board picks up every change live, so you can watch an agent work.
 
+### Claude Code plugin
+
+To have board.md available in every repo you open with Claude Code, install the plugin once. Run
+these inside Claude Code:
+
+```
+/plugin marketplace add anojanst/board.md
+/plugin install boardmd@board-md
+```
+
+| Skill | What it does |
+| --- | --- |
+| `/boardmd:setup` | Installs board.md in the current repo with its package manager, runs `boardmd init`, and reports what was written. |
+| `/boardmd:board` | Starts the board for the current repo and opens it in your browser. |
+| `/boardmd:tasks` | Claude uses this by itself when you ask to add, update, list or check tasks. It runs `boardmd guide` first, then `new`, `set`, `list` and `check`. |
+
+The plugin lives in [`plugins/boardmd/`](plugins/boardmd/) in this repository.
+
 `list --json` prints each task's frontmatter plus `file`, `folder`, `filename` and, when there is
 one, `live`: `{ "state": "in-progress", "branch" }`, `{ "state": "in-review", "pr", "base", "note" }`
 (note is `draft`, `changes requested`, `approved` or empty) or `{ "state": "merged", "pr", "note" }`.
