@@ -19,7 +19,8 @@ in whatever shape you already use. A small config file tells the board which fie
   Claude Code skill) how.
 
 It suits repos where a coding agent keeps the task files: the board reads the agent's files as
-they are and shows its branches and pull requests as they happen.
+they are and shows its branches and pull requests as they happen. Why it exists:
+[My coding agents don't need a project management tool. They need markdown files.](https://dev.to/anojanst/my-coding-agents-dont-need-a-project-management-tool-they-need-markdown-files-2m0i)
 
 ## Quick start
 
